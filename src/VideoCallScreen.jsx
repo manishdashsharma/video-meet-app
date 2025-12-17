@@ -1,0 +1,273 @@
+import React, { useState } from "react";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
+import AgoraRTC, { AgoraRTCProvider } from "agora-rtc-react";
+import {
+  LocalUser,
+  RemoteUser,
+  useJoin,
+  useLocalMicrophoneTrack,
+  useLocalCameraTrack,
+  useLocalScreenTrack,
+  usePublish,
+  useRemoteUsers,
+} from "agora-rtc-react";
+
+const MicOnIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
+    <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+    <line x1="12" y1="19" x2="12" y2="23"></line>
+    <line x1="8" y1="23" x2="16" y2="23"></line>
+  </svg>
+);
+
+const MicOffIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="1" y1="1" x2="23" y2="23"></line>
+    <path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6"></path>
+    <path d="M17 16.95A7 7 0 0 1 5 12v-2m14 0v2a7 7 0 0 1-.11 1.23"></path>
+    <line x1="12" y1="19" x2="12" y2="23"></line>
+    <line x1="8" y1="23" x2="16" y2="23"></line>
+  </svg>
+);
+
+const CameraOnIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M23 7l-7 5 7 5V7z"></path>
+    <rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect>
+  </svg>
+);
+
+const CameraOffIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="1" y1="1" x2="23" y2="23"></line>
+    <path d="M21 21H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h3m3-3h6l2 3h4a2 2 0 0 1 2 2v9.34m-7.72-2.06a4 4 0 1 1-5.56-5.56"></path>
+  </svg>
+);
+
+const LeaveIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm3.5-9c.83 0 1.5-.67 1.5-1.5S16.33 8 15.5 8 14 8.67 14 9.5s.67 1.5 1.5 1.5zm-7 0c.83 0 1.5-.67 1.5-1.5S9.33 8 8.5 8 7 8.67 7 9.5 7.67 11 8.5 11zm3.5 6.5c2.33 0 4.31-1.46 5.11-3.5H6.89c.8 2.04 2.78 3.5 5.11 3.5z"></path>
+  </svg>
+);
+
+const InfoIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="10"></circle>
+    <line x1="12" y1="16" x2="12" y2="12"></line>
+    <line x1="12" y1="8" x2="12.01" y2="8"></line>
+  </svg>
+);
+
+const SettingsIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="3"></circle>
+    <path d="M12 1v6m0 6v6m8.66-15l-3 5.2M8.34 14.8l-3 5.2M23 12h-6m-6 0H5m15.66 8.66l-3-5.2M8.34 9.2l-3-5.2"></path>
+  </svg>
+);
+
+const UserIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+    <circle cx="12" cy="7" r="4"></circle>
+  </svg>
+);
+
+const MoreIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="1"></circle>
+    <circle cx="19" cy="12" r="1"></circle>
+    <circle cx="5" cy="12" r="1"></circle>
+  </svg>
+);
+
+const ShareIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+    <line x1="8" y1="21" x2="16" y2="21"></line>
+    <line x1="12" y1="17" x2="12" y2="21"></line>
+  </svg>
+);
+
+const VideoCall = () => {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const { id } = useParams();
+
+  const { appId, channel, token } = location.state || {};
+
+  const [micOn, setMic] = useState(true);
+  const [cameraOn, setCamera] = useState(true);
+  const [screenSharing, setScreenSharing] = useState(false);
+
+  const { localMicrophoneTrack } = useLocalMicrophoneTrack(micOn);
+  const { localCameraTrack } = useLocalCameraTrack(cameraOn);
+  const { screenTrack, isLoading: isScreenLoading, error: screenError } = useLocalScreenTrack(screenSharing, {}, "disable");
+
+  useJoin({ appid: appId, channel: channel || id, token: token || null }, true);
+  usePublish([localMicrophoneTrack, localCameraTrack, screenTrack]);
+
+  const remoteUsers = useRemoteUsers();
+
+  const handleScreenShare = () => {
+    setScreenSharing((prev) => !prev);
+  };
+
+  const getGridClasses = (count) => {
+    if (count >= 7) return "grid-cols-3";
+    if (count >= 5) return "grid-cols-3";
+    if (count >= 3) return "grid-cols-2";
+    if (count === 2) return "grid-cols-2";
+    if (count === 1) return "grid-cols-1";
+    return "grid-cols-1";
+  };
+
+  const gridClasses = getGridClasses(remoteUsers.length);
+
+  const handleLeave = () => {
+    navigate('/');
+  };
+
+  return (
+    <div className="h-screen w-screen flex flex-col relative text-white" style={{ backgroundColor: '#3D3D3D' }}>
+      {/* Header */}
+      <header className="flex items-center justify-between px-6 py-4" style={{ backgroundColor: '#1C2C56' }}>
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded flex items-center justify-center" style={{ backgroundColor: '#142C8E' }}>
+            <UserIcon />
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="font-semibold text-lg">{channel || id || 'Classroom'}</span>
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="3 4.5 6 7.5 9 4.5"></polyline>
+            </svg>
+          </div>
+        </div>
+        <div className="flex items-center gap-4">
+          <button className="p-2 hover:bg-white hover:bg-opacity-10 rounded-full transition-colors">
+            <InfoIcon />
+          </button>
+          <button className="p-2 hover:bg-white hover:bg-opacity-10 rounded-full transition-colors">
+            <SettingsIcon />
+          </button>
+        </div>
+      </header>
+
+      {/* Remote Users Grid */}
+      <div className={`flex-1 grid ${gridClasses} gap-4 p-6`}>
+        {remoteUsers.length > 0 ? (
+          remoteUsers.map((user) => (
+            <div key={user.uid} className="rounded-xl overflow-hidden relative shadow-lg" style={{ backgroundColor: '#1C2C56' }}>
+              <RemoteUser user={user} className="w-full h-full object-cover" />
+              <div className="absolute bottom-4 left-4 px-3 py-1.5 rounded-lg text-sm font-medium" style={{ backgroundColor: 'rgba(0, 0, 0, 0.6)' }}>
+                {user.uid}
+              </div>
+            </div>
+          ))
+        ) : (
+          <div className="col-span-full flex flex-col items-center justify-center h-full">
+            <UserIcon />
+            <p className="mt-4 text-xl" style={{ color: '#D9D9D9' }}>
+              Waiting for other users to join...
+            </p>
+          </div>
+        )}
+      </div>
+
+      {/* Local User Overlay */}
+      <div className="absolute top-24 right-6 w-64 h-48 rounded-xl overflow-hidden shadow-2xl z-10 border-2" style={{ backgroundColor: '#0A0A0A', borderColor: '#142C8E' }}>
+        <LocalUser
+          audioTrack={localMicrophoneTrack}
+          cameraOn={cameraOn}
+          micOn={micOn}
+          videoTrack={localCameraTrack}
+          className="w-full h-full object-cover"
+        />
+        <div className="absolute bottom-3 left-3 px-3 py-1.5 rounded-lg text-sm font-medium" style={{ backgroundColor: 'rgba(0, 0, 0, 0.6)' }}>
+          You
+        </div>
+      </div>
+
+      {/* Bottom Controls Bar */}
+      <div className="flex items-center justify-center gap-3 px-6 py-5" style={{ backgroundColor: '#0A0A0A' }}>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setMic((a) => !a)}
+            className="flex flex-col items-center gap-1 px-4 py-3 rounded-xl transition-all hover:bg-white hover:bg-opacity-5"
+            style={{ backgroundColor: micOn ? 'transparent' : '#ED5C5C20' }}
+          >
+            <div className={`p-2.5 rounded-full transition-colors ${micOn ? '' : 'bg-opacity-20'}`} style={{ backgroundColor: micOn ? '#1C2C56' : '#ED5C5C' }}>
+              {micOn ? <MicOnIcon /> : <MicOffIcon />}
+            </div>
+            <span className="text-xs font-medium">Mic</span>
+          </button>
+
+          <button className="flex items-center px-1 py-3">
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2">
+              <polyline points="3 4.5 6 7.5 9 4.5"></polyline>
+            </svg>
+          </button>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setCamera((a) => !a)}
+            className="flex flex-col items-center gap-1 px-4 py-3 rounded-xl transition-all hover:bg-white hover:bg-opacity-5"
+            style={{ backgroundColor: cameraOn ? 'transparent' : '#ED5C5C20' }}
+          >
+            <div className={`p-2.5 rounded-full transition-colors`} style={{ backgroundColor: cameraOn ? '#1C2C56' : '#ED5C5C' }}>
+              {cameraOn ? <CameraOnIcon /> : <CameraOffIcon />}
+            </div>
+            <span className="text-xs font-medium">Camera</span>
+          </button>
+
+          <button className="flex items-center px-1 py-3">
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2">
+              <polyline points="3 4.5 6 7.5 9 4.5"></polyline>
+            </svg>
+          </button>
+        </div>
+
+        <button
+          onClick={handleScreenShare}
+          className="flex flex-col items-center gap-1 px-4 py-3 rounded-xl transition-all hover:bg-white hover:bg-opacity-5"
+          style={{ backgroundColor: screenSharing ? '#0DC38A20' : 'transparent' }}
+        >
+          <div className="p-2.5 rounded-full" style={{ backgroundColor: screenSharing ? '#0DC38A' : '#1C2C56' }}>
+            <ShareIcon />
+          </div>
+          <span className="text-xs font-medium">{screenSharing ? 'Stop Share' : 'Share'}</span>
+        </button>
+
+        <button className="flex flex-col items-center gap-1 px-4 py-3 rounded-xl transition-all hover:bg-white hover:bg-opacity-5">
+          <div className="p-2.5 rounded-full" style={{ backgroundColor: '#1C2C56' }}>
+            <MoreIcon />
+          </div>
+          <span className="text-xs font-medium">More</span>
+        </button>
+
+        <button
+          onClick={handleLeave}
+          className="flex flex-col items-center gap-1 px-6 py-3 rounded-xl transition-all hover:opacity-90 ml-4"
+          style={{ backgroundColor: '#ED5C5C' }}
+        >
+          <div className="p-2.5 rounded-full" style={{ backgroundColor: 'rgba(255, 255, 255, 0.2)' }}>
+            <LeaveIcon />
+          </div>
+          <span className="text-xs font-semibold">Leave</span>
+        </button>
+      </div>
+    </div>
+  );
+};
+
+const VideoCallScreen = () => {
+  const client = AgoraRTC.createClient({ mode: "rtc", codec: "vp8" });
+  return (
+    <AgoraRTCProvider client={client}>
+      <VideoCall />
+    </AgoraRTCProvider>
+  );
+};
+
+export default VideoCallScreen;
