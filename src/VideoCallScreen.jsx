@@ -95,7 +95,7 @@ const VideoCall = () => {
 
   const { localMicrophoneTrack } = useLocalMicrophoneTrack(micOn);
   const { localCameraTrack } = useLocalCameraTrack(cameraOn);
-  const { screenTrack, isLoading: isScreenLoading, error: screenError } = useLocalScreenTrack(screenSharing, {}, "disable");
+  const { screenTrack } = useLocalScreenTrack(screenSharing, {}, "disable");
 
   useJoin({ appid: appId, channel: channel || id, token: token || null }, true);
   usePublish([localMicrophoneTrack, localCameraTrack, screenTrack]);
@@ -123,14 +123,11 @@ const VideoCall = () => {
 
   return (
     <div className="h-screen w-screen flex flex-col relative text-white" style={{ backgroundColor: '#3D3D3D' }}>
-      {/* Header - Removed for cleaner enterprise look */}
-
-      {/* Main Content Area - Screen Share or Remote Users */}
-      <div className={`flex-1 p-4 flex ${screenSharing && screenTrack ? 'flex-col' : 'items-center justify-center'} gap-4`}>
+      <div className={`flex-1 p-4 flex ${screenSharing && screenTrack ? 'flex-row' : 'items-center justify-center'} gap-4`}>
         {screenSharing && screenTrack ? (
           <>
-            {/* Local Screen Share */}
-            <div className="flex-1 w-full rounded-xl relative shadow-lg flex items-center justify-center" style={{ backgroundColor: '#1C2C56', overflow: 'hidden', minHeight: 0 }}>
+            {/* Screen Share on Left */}
+            <div className="flex-1 rounded-xl relative shadow-lg flex items-center justify-center" style={{ backgroundColor: '#1C2C56', overflow: 'hidden' }}>
               <div style={{ width: '100%', height: '100%', position: 'relative' }}>
                 <video
                   ref={(ref) => {
@@ -148,43 +145,59 @@ const VideoCall = () => {
                 />
               </div>
               <div className="absolute bottom-4 left-4 px-3 py-1.5 rounded-lg text-sm font-medium z-10" style={{ backgroundColor: 'rgba(0, 0, 0, 0.7)', backdropFilter: 'blur(4px)' }}>
-                Your Screen
+                screen share
               </div>
             </div>
 
-            {/* Remote Users Below Screen Share */}
-            {remoteUsers.length > 0 && (
-              <div className="flex gap-4 justify-center" style={{ height: '200px' }}>
-                {remoteUsers.map((user) => (
-                  <div
-                    key={user.uid}
-                    className="rounded-xl relative shadow-lg flex items-center justify-center"
-                    style={{
-                      backgroundColor: '#1C2C56',
-                      overflow: 'hidden',
-                      width: '280px'
-                    }}
-                  >
-                    {user.hasVideo ? (
-                      <div style={{ width: '100%', height: '100%', position: 'relative' }}>
-                        <RemoteUser
-                          user={user}
-                          playVideo={true}
-                          playAudio={true}
-                        />
-                      </div>
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center">
-                        <UserIcon />
-                      </div>
-                    )}
-                    <div className="absolute bottom-2 left-2 px-2 py-1 rounded text-xs font-medium z-10" style={{ backgroundColor: 'rgba(0, 0, 0, 0.7)', backdropFilter: 'blur(4px)' }}>
-                      {user.uid}
-                    </div>
+            {/* Videos on Right Side */}
+            <div className="flex flex-col gap-4" style={{ width: '320px' }}>
+              {/* Local User */}
+              <div className="rounded-2xl overflow-hidden shadow-xl border" style={{ backgroundColor: '#000000', borderColor: '#3D3D3D', height: '240px' }}>
+                {cameraOn ? (
+                  <LocalUser
+                    audioTrack={localMicrophoneTrack}
+                    cameraOn={cameraOn}
+                    micOn={micOn}
+                    videoTrack={localCameraTrack}
+                    playVideo={true}
+                    playAudio={false}
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center" style={{ backgroundColor: '#1C2C56' }}>
+                    <UserIcon />
                   </div>
-                ))}
+                )}
+                <div className="absolute bottom-2 left-2 px-2 py-1 rounded text-xs font-medium" style={{ backgroundColor: 'rgba(0, 0, 0, 0.8)' }}>
+                  local
+                </div>
               </div>
-            )}
+
+              {/* Remote Users */}
+              {remoteUsers.map((user) => (
+                <div
+                  key={user.uid}
+                  className="rounded-2xl overflow-hidden shadow-xl border relative"
+                  style={{ backgroundColor: '#1C2C56', borderColor: '#3D3D3D', height: '240px' }}
+                >
+                  {user.hasVideo ? (
+                    <div style={{ width: '100%', height: '100%', position: 'relative' }}>
+                      <RemoteUser
+                        user={user}
+                        playVideo={true}
+                        playAudio={true}
+                      />
+                    </div>
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <UserIcon />
+                    </div>
+                  )}
+                  <div className="absolute bottom-2 left-2 px-2 py-1 rounded text-xs font-medium" style={{ backgroundColor: 'rgba(0, 0, 0, 0.8)' }}>
+                    remote
+                  </div>
+                </div>
+              ))}
+            </div>
           </>
         ) : remoteUsers.length > 0 ? (
           /* Remote Users Grid (when not screen sharing) */
@@ -228,26 +241,28 @@ const VideoCall = () => {
         )}
       </div>
 
-      {/* Local User Overlay */}
-      <div className="absolute top-6 right-6 w-64 h-48 rounded-2xl overflow-hidden shadow-2xl z-20 border" style={{ backgroundColor: '#000000', borderColor: '#3D3D3D' }}>
-        {cameraOn ? (
-          <LocalUser
-            audioTrack={localMicrophoneTrack}
-            cameraOn={cameraOn}
-            micOn={micOn}
-            videoTrack={localCameraTrack}
-            playVideo={true}
-            playAudio={false}
-          />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center" style={{ backgroundColor: '#1C2C56' }}>
-            <UserIcon />
+      {/* Local User Overlay - Only show when NOT screen sharing */}
+      {!screenSharing && (
+        <div className="absolute top-6 right-6 w-64 h-48 rounded-2xl overflow-hidden shadow-2xl z-20 border" style={{ backgroundColor: '#000000', borderColor: '#3D3D3D' }}>
+          {cameraOn ? (
+            <LocalUser
+              audioTrack={localMicrophoneTrack}
+              cameraOn={cameraOn}
+              micOn={micOn}
+              videoTrack={localCameraTrack}
+              playVideo={true}
+              playAudio={false}
+            />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center" style={{ backgroundColor: '#1C2C56' }}>
+              <UserIcon />
+            </div>
+          )}
+          <div className="absolute bottom-2 left-2 px-2 py-1 rounded text-xs font-medium z-10" style={{ backgroundColor: 'rgba(0, 0, 0, 0.8)' }}>
+            You
           </div>
-        )}
-        <div className="absolute bottom-2 left-2 px-2 py-1 rounded text-xs font-medium z-10" style={{ backgroundColor: 'rgba(0, 0, 0, 0.8)' }}>
-          You
         </div>
-      </div>
+      )}
 
       {/* Bottom Controls Bar */}
       <div className="flex items-center justify-center gap-4 px-8 py-6" style={{ backgroundColor: '#0A0A0A' }}>
