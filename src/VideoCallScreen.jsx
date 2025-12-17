@@ -154,19 +154,36 @@ const VideoCall = () => {
       </header>
 
       {/* Remote Users Grid */}
-      <div className={`flex-1 grid ${gridClasses} gap-4 p-6 overflow-hidden`}>
+      <div className={`flex-1 grid ${gridClasses} gap-4 p-4`} style={{ height: 'calc(100vh - 160px)' }}>
         {remoteUsers.length > 0 ? (
           remoteUsers.map((user) => (
-            <div key={user.uid} className="rounded-xl overflow-hidden relative shadow-lg w-full h-full min-h-0" style={{ backgroundColor: '#1C2C56' }}>
-              <div className="w-full h-full">
+            <div
+              key={user.uid}
+              className="rounded-xl overflow-hidden relative shadow-lg"
+              style={{
+                backgroundColor: '#1C2C56',
+                width: '100%',
+                height: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                position: 'relative'
+              }}
+            >
+              <div style={{
+                width: '100%',
+                maxWidth: '100%',
+                aspectRatio: '16/9',
+                position: 'relative',
+                margin: 'auto'
+              }}>
                 <RemoteUser
                   user={user}
                   playVideo={true}
                   playAudio={true}
-                  style={{ width: '100%', height: '100%' }}
                 />
               </div>
-              <div className="absolute bottom-4 left-4 px-3 py-1.5 rounded-lg text-sm font-medium" style={{ backgroundColor: 'rgba(0, 0, 0, 0.7)', backdropFilter: 'blur(4px)' }}>
+              <div className="absolute bottom-4 left-4 px-3 py-1.5 rounded-lg text-sm font-medium z-10" style={{ backgroundColor: 'rgba(0, 0, 0, 0.7)', backdropFilter: 'blur(4px)' }}>
                 {user.uid}
               </div>
             </div>
@@ -183,18 +200,15 @@ const VideoCall = () => {
 
       {/* Local User Overlay */}
       <div className="absolute top-20 right-6 w-72 h-52 rounded-xl overflow-hidden shadow-2xl z-20 border-2" style={{ backgroundColor: '#0A0A0A', borderColor: '#142C8E' }}>
-        <div className="w-full h-full">
-          <LocalUser
-            audioTrack={localMicrophoneTrack}
-            cameraOn={cameraOn}
-            micOn={micOn}
-            videoTrack={localCameraTrack}
-            playVideo={true}
-            playAudio={false}
-            style={{ width: '100%', height: '100%' }}
-          />
-        </div>
-        <div className="absolute bottom-3 left-3 px-3 py-1.5 rounded-lg text-sm font-semibold" style={{ backgroundColor: 'rgba(0, 0, 0, 0.7)', backdropFilter: 'blur(4px)' }}>
+        <LocalUser
+          audioTrack={localMicrophoneTrack}
+          cameraOn={cameraOn}
+          micOn={micOn}
+          videoTrack={localCameraTrack}
+          playVideo={true}
+          playAudio={false}
+        />
+        <div className="absolute bottom-3 left-3 px-3 py-1.5 rounded-lg text-sm font-semibold z-10" style={{ backgroundColor: 'rgba(0, 0, 0, 0.7)', backdropFilter: 'blur(4px)' }}>
           You
         </div>
       </div>
