@@ -1,6 +1,6 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
-import AgoraRTC, { AgoraRTCProvider } from "agora-rtc-react";
+import AgoraRTC, { AgoraRTCProvider, useRTCClient } from "agora-rtc-react";
 import {
   LocalUser,
   RemoteUser,
@@ -109,38 +109,107 @@ const VideoCall = () => {
   const { localCameraTrack } = useLocalCameraTrack(cameraOn);
   const { screenTrack } = useLocalScreenTrack(screenSharing, {}, "disable");
 
+  const client = useRTCClient();
+
   useJoin({ appid: appId, channel: channel || id, token: token || null }, true);
   usePublish([localMicrophoneTrack, localCameraTrack, screenTrack]);
 
   const remoteUsers = useRemoteUsers();
 
-  // Detect if any remote user is sharing screen
-  // Screen share comes through as a video track from a remote user
+  // Track which users are publishing screen tracks
+  useEffect(() => {
+    if (!client) return;
+
+    const handleUserPublished = async (user, mediaType) => {
+      console.log('🎥 User published:', user.uid, mediaType);
+    };
+
+    const handleUserUnpublished = (user, mediaType) => {
+      console.log('🔇 User unpublished:', user.uid, mediaType);
+    };
+
+    client.on('user-published', handleUserPublished);
+    client.on('user-unpublished', handleUserUnpublished);
+
+    return () => {
+      client.off('user-published', handleUserPublished);
+      client.off('user-unpublished', handleUserUnpublished);
+    };
+  }, [client]);
+
+  // Find the remote screen share track
   const remoteScreenShare = remoteUsers.find(user => {
     if (!user.videoTrack) return false;
+
     const track = user.videoTrack;
 
-    // Check various properties that indicate screen share
-    // 1. Track ID might contain 'screen'
-    if (track._ID && (track._ID.toLowerCase().includes('screen'))) {
-      console.log('Screen share detected via _ID:', track._ID);
+    // Method 1: Check Agora track ID for "scr" or "screen"
+    // Agora uses track IDs like "track-scr-v-xxxxx" for screen shares
+    if (track._ID) {
+      const trackId = track._ID.toLowerCase();
+      if (trackId.includes('scr') || trackId.includes('screen')) {
+        console.log('✅ Found screen share via Agora track ID:', track._ID, 'user:', user.uid);
+        return true;
+      }
+    }
+
+    // Method 2: Check MediaStreamTrack label
+    const mediaStreamTrack = track.getMediaStreamTrack?.();
+    if (mediaStreamTrack?.label) {
+      const label = mediaStreamTrack.label.toLowerCase();
+      if (label.includes('screen') || label.includes('monitor') || label.includes('window') || label.includes('display')) {
+        console.log('✅ Found screen share via label:', mediaStreamTrack.label, 'user:', user.uid);
+        return true;
+      }
+    }
+
+    // Method 3: Check track type property
+    if (track.trackMediaType === 'screen' || track.isScreenTrack) {
+      console.log('✅ Found screen share via track type:', user.uid);
       return true;
     }
 
-    // 2. Track label might indicate screen share
-    if (track.label && track.label.toLowerCase().includes('screen')) {
-      console.log('Screen share detected via label:', track.label);
-      return true;
-    }
+    // Method 4: Check resolution - screen shares typically have larger dimensions than cameras
+    // Camera feeds are usually 640x480 or 1280x720
+    // Screen shares are typically > 1280px in width or > 720px in height
+    if (mediaStreamTrack) {
+      const settings = mediaStreamTrack.getSettings?.();
+      if (settings) {
+        const width = settings.width;
+        const height = settings.height;
+        console.log(`📐 Track ${track._ID} dimensions:`, width, 'x', height, 'user:', user.uid);
 
-    // 3. Check if track type is screen (Agora specific)
-    if (track.isScreenTrack || track.getMediaStreamTrack()?.label?.toLowerCase().includes('screen')) {
-      console.log('Screen share detected via track type');
-      return true;
+        // If either dimension is larger than typical webcam resolution, likely a screen share
+        if (width > 1280 || height > 900) {
+          console.log('✅ Found screen share via resolution:', width, 'x', height, 'user:', user.uid);
+          return true;
+        }
+      }
     }
 
     return false;
   });
+
+  // Debug logging
+  useEffect(() => {
+    console.log('📊 Screen share detection debug:', {
+      myScreenSharing: screenSharing,
+      remoteUsersCount: remoteUsers.length,
+      remoteUsers: remoteUsers.map(u => ({
+        uid: u.uid,
+        hasVideo: !!u.videoTrack,
+        hasAudio: !!u.audioTrack,
+        videoTrackID: u.videoTrack?._ID,
+        videoTrackLabel: u.videoTrack?.getMediaStreamTrack?.()?.label,
+        videoEnabled: u.videoTrack?.enabled,
+        videoPlaying: u.videoTrack?.isPlaying
+      })),
+      foundScreenShare: remoteScreenShare ? {
+        uid: remoteScreenShare.uid,
+        trackID: remoteScreenShare.videoTrack?._ID
+      } : null
+    });
+  }, [remoteUsers, remoteScreenShare, screenSharing]);
 
   const handleWhiteboardUpdate = (data) => {
     // Broadcast whiteboard updates to other users

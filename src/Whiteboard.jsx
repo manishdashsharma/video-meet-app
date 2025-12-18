@@ -1,25 +1,41 @@
 import { Tldraw, useEditor } from 'tldraw';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import 'tldraw/tldraw.css';
 
 const WhiteboardContent = ({ onSyncUpdate, remoteData }) => {
   const editor = useEditor();
+  const debounceTimerRef = useRef(null);
+  const isApplyingRemoteDataRef = useRef(false);
 
-  // Listen for local changes and broadcast them
+  // Listen for local changes and broadcast them (with debouncing)
   useEffect(() => {
     if (!editor) return;
 
     const handleChange = () => {
-      const snapshot = editor.store.getSnapshot();
-      if (onSyncUpdate) {
-        onSyncUpdate(snapshot);
+      // Don't broadcast changes that came from remote data
+      if (isApplyingRemoteDataRef.current) return;
+
+      // Clear previous timer
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
       }
+
+      // Debounce: wait 150ms after last change before broadcasting
+      debounceTimerRef.current = setTimeout(() => {
+        const snapshot = editor.store.getSnapshot();
+        if (onSyncUpdate) {
+          onSyncUpdate(snapshot);
+        }
+      }, 150);
     };
 
     const unsubscribe = editor.store.listen(handleChange);
 
     return () => {
       unsubscribe();
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
     };
   }, [editor, onSyncUpdate]);
 
@@ -28,10 +44,19 @@ const WhiteboardContent = ({ onSyncUpdate, remoteData }) => {
     if (!editor || !remoteData) return;
 
     try {
+      // Set flag to prevent broadcasting our own remote updates
+      isApplyingRemoteDataRef.current = true;
+
       // Apply the remote snapshot to the local editor
       editor.store.loadSnapshot(remoteData);
+
+      // Reset flag after a short delay
+      setTimeout(() => {
+        isApplyingRemoteDataRef.current = false;
+      }, 100);
     } catch (error) {
       console.error('Failed to apply remote whiteboard data:', error);
+      isApplyingRemoteDataRef.current = false;
     }
   }, [editor, remoteData]);
 
