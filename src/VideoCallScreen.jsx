@@ -11,6 +11,7 @@ import {
   usePublish,
   useRemoteUsers,
 } from "agora-rtc-react";
+import Whiteboard from "./Whiteboard";
 
 const MicOnIcon = () => (
   <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -82,6 +83,15 @@ const ShareIcon = () => (
   </svg>
 );
 
+const WhiteboardIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M12 19l7-7 3 3-7 7-3-3z"></path>
+    <path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"></path>
+    <path d="M2 2l7.586 7.586"></path>
+    <circle cx="11" cy="11" r="2"></circle>
+  </svg>
+);
+
 const VideoCall = () => {
   const location = useLocation();
   const navigate = useNavigate();
@@ -92,6 +102,8 @@ const VideoCall = () => {
   const [micOn, setMic] = useState(initialMicOn);
   const [cameraOn, setCamera] = useState(initialCameraOn);
   const [screenSharing, setScreenSharing] = useState(false);
+  const [whiteboardOpen, setWhiteboardOpen] = useState(false);
+  const [whiteboardData, setWhiteboardData] = useState(null);
 
   const { localMicrophoneTrack } = useLocalMicrophoneTrack(micOn);
   const { localCameraTrack } = useLocalCameraTrack(cameraOn);
@@ -101,6 +113,39 @@ const VideoCall = () => {
   usePublish([localMicrophoneTrack, localCameraTrack, screenTrack]);
 
   const remoteUsers = useRemoteUsers();
+
+  // Detect if any remote user is sharing screen
+  // Screen share comes through as a video track from a remote user
+  const remoteScreenShare = remoteUsers.find(user => {
+    if (!user.videoTrack) return false;
+    const track = user.videoTrack;
+
+    // Check various properties that indicate screen share
+    // 1. Track ID might contain 'screen'
+    if (track._ID && (track._ID.toLowerCase().includes('screen'))) {
+      console.log('Screen share detected via _ID:', track._ID);
+      return true;
+    }
+
+    // 2. Track label might indicate screen share
+    if (track.label && track.label.toLowerCase().includes('screen')) {
+      console.log('Screen share detected via label:', track.label);
+      return true;
+    }
+
+    // 3. Check if track type is screen (Agora specific)
+    if (track.isScreenTrack || track.getMediaStreamTrack()?.label?.toLowerCase().includes('screen')) {
+      console.log('Screen share detected via track type');
+      return true;
+    }
+
+    return false;
+  });
+
+  const handleWhiteboardUpdate = (data) => {
+    // Broadcast whiteboard updates to other users
+    setWhiteboardData(data);
+  };
 
   const handleScreenShare = () => {
     setScreenSharing((prev) => !prev);
@@ -123,8 +168,135 @@ const VideoCall = () => {
 
   return (
     <div className="h-screen w-screen flex flex-col relative text-white" style={{ backgroundColor: '#3D3D3D' }}>
-      <div className={`flex-1 p-4 flex ${screenSharing && screenTrack ? 'flex-row' : 'items-center justify-center'} gap-4`}>
-        {screenSharing && screenTrack ? (
+      <div className={`flex-1 p-4 flex ${(screenSharing && screenTrack) || whiteboardOpen || remoteScreenShare ? 'flex-row' : 'items-center justify-center'} gap-4`}>
+        {remoteScreenShare && !screenSharing && !whiteboardOpen ? (
+          <>
+            {/* Remote User's Screen Share on Left */}
+            <div className="flex-1 rounded-xl relative shadow-lg flex items-center justify-center" style={{ backgroundColor: '#1C2C56', overflow: 'hidden' }}>
+              <div style={{ width: '100%', height: '100%', position: 'relative' }}>
+                <RemoteUser
+                  user={remoteScreenShare}
+                  playVideo={true}
+                  playAudio={true}
+                />
+              </div>
+              <div className="absolute bottom-4 left-4 px-3 py-1.5 rounded-lg text-sm font-medium z-10" style={{ backgroundColor: 'rgba(0, 0, 0, 0.7)', backdropFilter: 'blur(4px)' }}>
+                {remoteScreenShare.uid}'s screen
+              </div>
+            </div>
+
+            {/* Videos on Right Side */}
+            <div className="flex flex-col gap-4" style={{ width: '320px' }}>
+              {/* Local User */}
+              <div className="rounded-2xl overflow-hidden shadow-xl border relative" style={{ backgroundColor: '#000000', borderColor: '#3D3D3D', height: '240px' }}>
+                {cameraOn ? (
+                  <LocalUser
+                    audioTrack={localMicrophoneTrack}
+                    cameraOn={cameraOn}
+                    micOn={micOn}
+                    videoTrack={localCameraTrack}
+                    playVideo={true}
+                    playAudio={false}
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center" style={{ backgroundColor: '#1C2C56' }}>
+                    <UserIcon />
+                  </div>
+                )}
+                <div className="absolute bottom-2 left-2 px-2 py-1 rounded text-xs font-medium" style={{ backgroundColor: 'rgba(0, 0, 0, 0.8)' }}>
+                  You
+                </div>
+              </div>
+
+              {/* Other Remote Users (excluding the screen share) */}
+              {remoteUsers.filter(user => user !== remoteScreenShare).map((user) => (
+                <div
+                  key={user.uid}
+                  className="rounded-2xl overflow-hidden shadow-xl border relative"
+                  style={{ backgroundColor: '#1C2C56', borderColor: '#3D3D3D', height: '240px' }}
+                >
+                  {user.hasVideo ? (
+                    <div style={{ width: '100%', height: '100%', position: 'relative' }}>
+                      <RemoteUser
+                        user={user}
+                        playVideo={true}
+                        playAudio={true}
+                      />
+                    </div>
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <UserIcon />
+                    </div>
+                  )}
+                  <div className="absolute bottom-2 left-2 px-2 py-1 rounded text-xs font-medium" style={{ backgroundColor: 'rgba(0, 0, 0, 0.8)' }}>
+                    {user.uid}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
+        ) : whiteboardOpen ? (
+          <>
+            {/* Whiteboard on Left */}
+            <div className="flex-1 rounded-xl relative shadow-lg overflow-hidden" style={{ backgroundColor: '#1C2C56' }}>
+              <Whiteboard
+                embedded={true}
+                onUpdate={handleWhiteboardUpdate}
+                remoteData={whiteboardData}
+              />
+            </div>
+
+            {/* Videos on Right Side */}
+            <div className="flex flex-col gap-4" style={{ width: '320px' }}>
+              {/* Local User */}
+              <div className="rounded-2xl overflow-hidden shadow-xl border relative" style={{ backgroundColor: '#000000', borderColor: '#3D3D3D', height: '240px' }}>
+                {cameraOn ? (
+                  <LocalUser
+                    audioTrack={localMicrophoneTrack}
+                    cameraOn={cameraOn}
+                    micOn={micOn}
+                    videoTrack={localCameraTrack}
+                    playVideo={true}
+                    playAudio={false}
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center" style={{ backgroundColor: '#1C2C56' }}>
+                    <UserIcon />
+                  </div>
+                )}
+                <div className="absolute bottom-2 left-2 px-2 py-1 rounded text-xs font-medium" style={{ backgroundColor: 'rgba(0, 0, 0, 0.8)' }}>
+                  local
+                </div>
+              </div>
+
+              {/* Remote Users */}
+              {remoteUsers.map((user) => (
+                <div
+                  key={user.uid}
+                  className="rounded-2xl overflow-hidden shadow-xl border relative"
+                  style={{ backgroundColor: '#1C2C56', borderColor: '#3D3D3D', height: '240px' }}
+                >
+                  {user.hasVideo ? (
+                    <div style={{ width: '100%', height: '100%', position: 'relative' }}>
+                      <RemoteUser
+                        user={user}
+                        playVideo={true}
+                        playAudio={true}
+                      />
+                    </div>
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <UserIcon />
+                    </div>
+                  )}
+                  <div className="absolute bottom-2 left-2 px-2 py-1 rounded text-xs font-medium" style={{ backgroundColor: 'rgba(0, 0, 0, 0.8)' }}>
+                    remote
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
+        ) : screenSharing && screenTrack ? (
           <>
             {/* Screen Share on Left */}
             <div className="flex-1 rounded-xl relative shadow-lg flex items-center justify-center" style={{ backgroundColor: '#1C2C56', overflow: 'hidden' }}>
@@ -241,8 +413,8 @@ const VideoCall = () => {
         )}
       </div>
 
-      {/* Local User Overlay - Only show when NOT screen sharing */}
-      {!screenSharing && (
+      {/* Local User Overlay - Only show when NOT screen sharing, whiteboard, or viewing remote screen share */}
+      {!screenSharing && !whiteboardOpen && !remoteScreenShare && (
         <div className="absolute top-6 right-6 w-64 h-48 rounded-2xl overflow-hidden shadow-2xl z-20 border" style={{ backgroundColor: '#000000', borderColor: '#3D3D3D' }}>
           {cameraOn ? (
             <LocalUser
@@ -305,6 +477,15 @@ const VideoCall = () => {
           style={{ backgroundColor: screenSharing ? '#00C38A' : '#1C2C56' }}
         >
           <ShareIcon />
+        </button>
+
+        {/* Whiteboard */}
+        <button
+          onClick={() => setWhiteboardOpen(!whiteboardOpen)}
+          className="p-3 rounded-xl transition-all hover:bg-opacity-80"
+          style={{ backgroundColor: whiteboardOpen ? '#00C38A' : '#1C2C56' }}
+        >
+          <WhiteboardIcon />
         </button>
 
         {/* Chat */}
